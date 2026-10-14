@@ -1,0 +1,2 @@
+import Link from 'next/link';
+export default function NotFound(){return <main className="wrap"><div className="formbox"><span className="eyebrow" style={{color:'#096a60'}}>Page not found</span><h1>We couldn’t find that page.</h1><p className="muted">The link may be mistyped, or the business may have changed its booking page.</p><div className="hero-actions"><Link className="button" href="/#explore">Explore businesses</Link><Link className="button outline" href="/track">Check a booking</Link></div></div></main>}

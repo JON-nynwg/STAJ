@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "staj",
+  "main": "./build/cloudflare-worker.ts",
+  "compatibility_date": "2026-05-15",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": true,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "staj-db",
+      "database_id": "eb3f07b7-c4c6-4e41-a6fd-6e18af645721",
+      "migrations_dir": "drizzle"
+    }
+  ]
+}

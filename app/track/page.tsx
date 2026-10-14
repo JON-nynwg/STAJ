@@ -1,0 +1,1 @@
+import TrackForm from '@/components/TrackForm';export default function Track(){return <main className="wrap"><div className="formbox"><span className="eyebrow">Your appointment</span><h1>Check your booking.</h1><p className="muted">Use the reference shown when you booked and the same phone number.</p><TrackForm/></div></main>}
