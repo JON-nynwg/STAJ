@@ -1,10 +1,11 @@
 'use client';
 import { useMemo, useState } from 'react';
 import '../app/admin/admin.css';
+import BizLogo from './BizLogo';
 import { BarList, ColumnChart, type Pt, type Row } from './AdminCharts';
 
 type Stats = { pending: number; approved: number; suspended: number; owners: number; services: number; bookings: number; pendingBookings: number; week: number };
-type Biz = { id: string; slug: string; name: string; category: string; location: string; status: string; created_at: string; owner_email: string; blocked: number; services: number; bookings: number };
+type Biz = { id: string; slug: string; name: string; category: string; location: string; status: string; created_at: string; owner_email: string; blocked: number; logo_v: string | null; services: number; bookings: number };
 type Bk = { id: string; client_name: string; client_phone: string; appointment_at: string; status: string; created_at: string; service_name: string; price: number; business_name: string };
 
 const fmt = (iso: string) => new Date(iso).toLocaleString('en-KE', { timeZone: 'Africa/Nairobi', dateStyle: 'medium', timeStyle: 'short' });
@@ -67,7 +68,7 @@ export default function AdminDashboard({ stats, businesses, bookings, charts }: 
       <div className="adm-mail"><button className="adm-btn" disabled={!emails.length} onClick={mailAll}>Email {emails.length} shown {emails.length === 1 ? 'owner' : 'owners'}</button><button className="adm-btn" disabled={!emails.length} onClick={copyAll}>{copied ? 'Copied!' : 'Copy emails'}</button><span className="muted">Opens your own email app with owners hidden in BCC. Use the search and status filter to pick who gets it.</span></div>
       <div className="adm-wrap card"><table className="adm-table"><thead><tr><th>Business</th><th>Owner</th><th>Status</th><th>Services</th><th>Bookings</th><th>Joined</th><th>Actions</th></tr></thead><tbody>
         {shown.length ? shown.map(b => <tr key={b.id}>
-          <td><strong>{b.name}</strong><span className="adm-sub">{b.category} · {b.location}</span></td>
+          <td><div style={{ display: 'flex', gap: 10, alignItems: 'center' }}><BizLogo id={b.id} v={b.logo_v} name={b.name} size={36}/><div><strong>{b.name}</strong><span className="adm-sub">{b.category} · {b.location}</span></div></div></td>
           <td><a href={'mailto:' + b.owner_email} style={{ textDecoration: 'underline' }}>{b.owner_email}</a>{b.blocked ? <span className="adm-sub">login blocked</span> : null}</td>
           <td><span className={'adm-st ' + b.status}>{b.status === 'pending' ? 'Awaiting approval' : b.status === 'approved' ? 'Live' : 'Suspended'}</span></td>
           <td>{b.services}</td><td>{b.bookings}</td><td>{day(b.created_at)}</td>

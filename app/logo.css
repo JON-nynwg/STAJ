@@ -1,0 +1,12 @@
+.biz-logo{display:inline-grid;place-items:center;flex:none;border-radius:14px;overflow:hidden;background:#fff;border:1px solid var(--line);vertical-align:middle}
+.biz-logo img{width:100%;height:100%;object-fit:contain;padding:4px;display:block}
+.biz-logo.initial{background:var(--line);color:inherit;font-weight:800;font-family:'Playfair Display',serif}
+.biz-logo-row{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+.logo-picker{display:grid;gap:10px}
+.logo-picker .lp-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.logo-picker .lp-box{width:84px;height:84px;border-radius:16px;border:1px dashed var(--line);display:grid;place-items:center;background:#fff;overflow:hidden;color:#556;font-size:12px;text-align:center}
+.logo-picker .lp-box img{width:100%;height:100%;object-fit:contain;padding:6px}
+.logo-picker input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.logo-picker .lp-actions{display:flex;gap:8px;flex-wrap:wrap}
+.lp-btn{display:inline-flex;align-items:center;min-height:40px;padding:0 14px;border-radius:10px;border:1px solid var(--line);background:transparent;color:inherit;font-weight:700;cursor:pointer}
+.lp-btn:hover{border-color:var(--lime)}

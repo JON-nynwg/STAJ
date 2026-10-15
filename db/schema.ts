@@ -6,3 +6,4 @@ export const bookings = sqliteTable('bookings', { id: text('id').primaryKey(), b
 export const sessions = sqliteTable('sessions', { tokenHash: text('token_hash').primaryKey(), ownerId: text('owner_id').notNull().references(() => owners.id), expiresAt: text('expires_at').notNull() }, t => [index('sessions_owner').on(t.ownerId)]);
 export const rateLimits = sqliteTable('rate_limits', { key: text('key').primaryKey(), count: integer('count').notNull(), resetAt: text('reset_at').notNull() }, t => [index('rate_limits_reset').on(t.resetAt)]);
 export const adminSessions = sqliteTable('admin_sessions', { tokenHash: text('token_hash').primaryKey(), expiresAt: text('expires_at').notNull() });
+export const businessLogos = sqliteTable('business_logos', { businessId: text('business_id').primaryKey().references(() => businesses.id), contentType: text('content_type').notNull(), data: text('data').notNull(), updatedAt: text('updated_at').notNull() });

@@ -38,6 +38,7 @@ export async function POST(req: Request) {
     }
     if (action === 'delete') {
       await d.batch([
+        d.prepare('DELETE FROM business_logos WHERE business_id=?').bind(biz.id),
         d.prepare('DELETE FROM bookings WHERE business_id=?').bind(biz.id),
         d.prepare('DELETE FROM services WHERE business_id=?').bind(biz.id),
         d.prepare('DELETE FROM businesses WHERE id=?').bind(biz.id),

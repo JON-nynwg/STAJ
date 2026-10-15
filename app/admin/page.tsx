@@ -28,8 +28,8 @@ export default async function AdminPage() {
   const charts = { signups: bucket(signupRows), bookings: bucket(bookingRows), byStatus, byPlace };
   const week = await n(`SELECT COUNT(*) AS n FROM bookings WHERE created_at>='${new Date(Date.now() - 7 * 86400000).toISOString()}'`);
   const count = (s: string) => businesses.find(b => b.status === s)?.n ?? 0;
-  const list = await query<{ id: string; slug: string; name: string; category: string; location: string; status: string; created_at: string; owner_email: string; blocked: number; services: number; bookings: number }>(
-    `SELECT b.id,b.slug,b.name,b.category,b.location,b.status,b.created_at,o.email AS owner_email,o.blocked,
+  const list = await query<{ id: string; slug: string; name: string; category: string; location: string; status: string; created_at: string; owner_email: string; blocked: number; logo_v: string | null; services: number; bookings: number }>(
+    `SELECT b.id,b.slug,b.name,b.category,b.location,b.status,b.created_at,o.email AS owner_email,o.blocked,(SELECT updated_at FROM business_logos l WHERE l.business_id=b.id) AS logo_v,
       (SELECT COUNT(*) FROM services s WHERE s.business_id=b.id) AS services,
       (SELECT COUNT(*) FROM bookings k WHERE k.business_id=b.id) AS bookings
      FROM businesses b JOIN owners o ON o.id=b.owner_id
