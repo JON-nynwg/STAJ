@@ -3,11 +3,13 @@ import { redirect } from 'next/navigation';
 import AdminDashboard from '@/components/AdminDashboard';
 import { adminSession } from '@/lib/admin';
 import { one, query } from '@/lib/server';
+import { expireUnpaid, getPlatformPay } from '@/lib/payments';
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Admin | STAJ', robots: { index: false, follow: false } };
 
 export default async function AdminPage() {
   if (!await adminSession()) redirect('/admin/login');
+  await expireUnpaid();
   const n = async (sql: string) => (await one<{ n: number }>(sql))?.n ?? 0;
   const [businesses, owners, services, bookings, pendingBookings] = await Promise.all([
     query<{ status: string; n: number }>('SELECT status,COUNT(*) AS n FROM businesses GROUP BY status'),
@@ -38,7 +40,21 @@ export default async function AdminPage() {
     `SELECT k.id,k.client_name,k.client_phone,k.appointment_at,k.status,k.created_at,s.name AS service_name,s.price,b.name AS business_name
      FROM bookings k JOIN services s ON s.id=k.service_id JOIN businesses b ON b.id=k.business_id
      ORDER BY k.created_at DESC LIMIT 150`);
-  return <AdminDashboard
+  const pays = await query<{ id: string; client_name: string; client_phone: string; appointment_at: string; status: string; created_at: string; service_name: string; business_name: string; total_price: number; deposit_amount: number; commission_rate: number; commission_amount: number; salon_deposit_share: number; balance_amount: number; payment_status: string; payment_ref: string; payout_status: string; payout_ref: string; refund_status: string; refund_ref: string; payout_type: string; payout_name: string; payout_number: string; payout_account: string }>(
+    `SELECT k.id,k.client_name,k.client_phone,k.appointment_at,k.status,k.created_at,s.name AS service_name,b.name AS business_name,k.total_price,k.deposit_amount,k.commission_rate,k.commission_amount,k.salon_deposit_share,k.balance_amount,k.payment_status,k.payment_ref,k.payout_status,k.payout_ref,k.refund_status,k.refund_ref,b.payout_type,b.payout_name,b.payout_number,b.payout_account
+     FROM bookings k JOIN services s ON s.id=k.service_id JOIN businesses b ON b.id=k.business_id
+     WHERE k.payment_status<>'none' AND NOT (k.payment_status='expired' AND k.payment_ref='')
+     ORDER BY (k.payment_status='deposit_submitted') DESC,(k.payout_status='due') DESC,(k.refund_status='due') DESC,k.created_at DESC LIMIT 300`);
+  const sum = async (sql: string) => (await one<{ n: number | null }>(sql))?.n ?? 0;
+  const money = {
+    commission: await sum("SELECT SUM(commission_amount) AS n FROM bookings WHERE payment_status='deposit_paid' AND refund_status<>'refunded'"),
+    payoutsDue: await sum("SELECT SUM(salon_deposit_share) AS n FROM bookings WHERE payout_status='due'"),
+    refundsDue: await sum("SELECT SUM(deposit_amount) AS n FROM bookings WHERE refund_status='due'"),
+    toCheck: await n("SELECT COUNT(*) AS n FROM bookings WHERE payment_status='deposit_submitted'"),
+  };
+  const platform = await getPlatformPay();
+  const noPayout = await query<{ id: string; name: string }>("SELECT id,name FROM businesses WHERE status='approved' AND payout_type=''");
+  return <AdminDashboard money={money} pays={pays} platform={platform} noPayout={noPayout}
     stats={{ pending: count('pending'), approved: count('approved'), suspended: count('suspended'), owners, services, bookings, pendingBookings, week }}
     businesses={list} bookings={recent} charts={charts}/>;
 }
