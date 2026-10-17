@@ -61,10 +61,41 @@ export async function confirmDeposit(bookingId: string, ref: string) {
   return r.meta.changes > 0;
 }
 
-export type PlatformPay = { type: string; name: string; number: string; account: string; instructions: string };
-export async function getPlatformPay(): Promise<PlatformPay> {
-  const rows = await query<{ key: string; value: string }>("SELECT key,value FROM platform_settings WHERE key LIKE 'pay_%'");
-  const m = Object.fromEntries(rows.map(r => [r.key, r.value]));
-  return { type: m.pay_type || '', name: m.pay_name || '', number: m.pay_number || '', account: m.pay_account || '', instructions: m.pay_instructions || '' };
+export const MAX_METHODS = 5;
+export type Method = { id: string; type: string; name: string; number: string; account: string };
+export const methodText = (m: Method) => payoutText({ payout_type: m.type, payout_name: m.name, payout_number: m.number, payout_account: m.account });
+/** What the browser may see of a method: a label to pick by and the instruction to follow. */
+export const publicMethods = (ms: Method[]) => ms.map(m => ({ id: m.id, label: PAYOUT_LABEL[m.type] || m.type, text: methodText(m) }));
+
+export const listMethods = (kind: 'platform' | 'business', businessId = '') =>
+  query<Method>('SELECT id,type,name,number,account FROM payment_methods WHERE kind=? AND business_id=? ORDER BY position,created_at', kind, businessId);
+
+/** Keeps the salon's first method mirrored on the business row; deposit payouts and the "can take bookings" check read it. */
+export async function syncPrimary(businessId: string) {
+  const m = (await listMethods('business', businessId))[0];
+  await run('UPDATE businesses SET payout_type=?,payout_name=?,payout_number=?,payout_account=? WHERE id=?', m?.type || '', m?.name || '', m?.number || '', m?.account || '', businessId);
 }
-export const platformPayText = (p: PlatformPay) => p.type ? payoutText({ payout_type: p.type, payout_name: p.name, payout_number: p.number, payout_account: p.account }) : '';
+
+export async function addMethod(kind: 'platform' | 'business', businessId: string, p: { type: string; name: string; number: string; account: string }) {
+  const have = await listMethods(kind, businessId);
+  if (have.length >= MAX_METHODS) return 'You can add up to ' + MAX_METHODS + ' payment methods.';
+  if (have.some(m => m.type === p.type && m.number === p.number && m.account === p.account)) return 'That payment method is already added.';
+  const pos = (await db().prepare('SELECT COALESCE(MAX(position),-1)+1 AS n FROM payment_methods WHERE kind=? AND business_id=?').bind(kind, businessId).first<{ n: number }>())?.n ?? 0;
+  await run('INSERT INTO payment_methods (id,kind,business_id,type,name,number,account,position,created_at) VALUES (?,?,?,?,?,?,?,?,?)', crypto.randomUUID(), kind, businessId, p.type, p.name, p.number, p.account, pos, new Date().toISOString());
+  if (kind === 'business') await syncPrimary(businessId);
+  return '';
+}
+export async function removeMethod(kind: 'platform' | 'business', businessId: string, id: string) {
+  const have = await listMethods(kind, businessId);
+  if (!have.some(m => m.id === id)) return 'Payment method not found.';
+  if (kind === 'business' && have.length <= 1) return 'Keep at least one payment method, or clients cannot book you. Add another first, then remove this one.';
+  await run('DELETE FROM payment_methods WHERE id=? AND kind=? AND business_id=?', id, kind, businessId);
+  if (kind === 'business') await syncPrimary(businessId);
+  return '';
+}
+export async function makePrimary(kind: 'platform' | 'business', businessId: string, id: string) {
+  const min = (await db().prepare('SELECT COALESCE(MIN(position),0)-1 AS n FROM payment_methods WHERE kind=? AND business_id=?').bind(kind, businessId).first<{ n: number }>())?.n ?? 0;
+  await run('UPDATE payment_methods SET position=? WHERE id=? AND kind=? AND business_id=?', min, id, kind, businessId);
+  if (kind === 'business') await syncPrimary(businessId);
+}
+export const getPlatformNote = async () => (await query<{ value: string }>("SELECT value FROM platform_settings WHERE key='pay_instructions'"))[0]?.value || '';

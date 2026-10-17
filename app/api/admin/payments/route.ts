@@ -1,5 +1,5 @@
 import { adminSession } from '@/lib/admin';
-import { confirmDeposit, parsePayout } from '@/lib/payments';
+import { addMethod, confirmDeposit, listMethods, makePrimary, parsePayout, removeMethod } from '@/lib/payments';
 import { clean, fail, json, one, run, safe } from '@/lib/server';
 
 const refOk = (s: string) => /^[A-Za-z0-9 _.-]{0,40}$/.test(s);
@@ -10,11 +10,16 @@ export async function POST(req: Request) {
     if (!refOk(ref)) return fail('Reference can only use letters, numbers, spaces and - _ .');
     const now = new Date().toISOString();
 
-    if (action === 'save-platform') {
+    if (action === 'add-platform') {
       const p = parsePayout(b);
       if ('error' in p) return fail(p.error);
-      const rows: [string, string][] = [['pay_type', p.type], ['pay_name', p.name], ['pay_number', p.number], ['pay_account', p.account], ['pay_instructions', clean(b.instructions, 300)]];
-      for (const [k, v] of rows) await run('INSERT INTO platform_settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', k, v);
+      const err = await addMethod('platform', '', p);
+      return err ? fail(err) : json({ ok: true, methods: await listMethods('platform') });
+    }
+    if (action === 'remove-platform') { const err = await removeMethod('platform', '', id); return err ? fail(err) : json({ ok: true, methods: await listMethods('platform') }); }
+    if (action === 'primary-platform') { await makePrimary('platform', '', id); return json({ ok: true, methods: await listMethods('platform') }); }
+    if (action === 'save-note') {
+      await run('INSERT INTO platform_settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', 'pay_instructions', clean(b.instructions, 300));
       return json({ ok: true });
     }
 

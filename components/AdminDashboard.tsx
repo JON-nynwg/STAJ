@@ -2,15 +2,16 @@
 import { useMemo, useState } from 'react';
 import '../app/admin/admin.css';
 import BizLogo from './BizLogo';
-import PayoutFields, { PAYOUT_LABEL } from './PayoutFields';
+import { PAYOUT_LABEL } from './PayoutFields';
+import MethodsEditor, { type Method } from './MethodsEditor';
 import { BarList, ColumnChart, type Pt, type Row } from './AdminCharts';
 
 type Stats = { pending: number; approved: number; suspended: number; owners: number; services: number; bookings: number; pendingBookings: number; week: number };
 type Biz = { id: string; slug: string; name: string; category: string; location: string; status: string; created_at: string; owner_email: string; blocked: number; logo_v: string | null; services: number; bookings: number };
 type Bk = { id: string; client_name: string; client_phone: string; appointment_at: string; status: string; created_at: string; service_name: string; price: number; business_name: string };
 
-type Pay = { id: string; client_name: string; client_phone: string; appointment_at: string; status: string; created_at: string; service_name: string; business_name: string; total_price: number; deposit_amount: number; commission_rate: number; commission_amount: number; salon_deposit_share: number; balance_amount: number; payment_status: string; payment_ref: string; payout_status: string; payout_ref: string; refund_status: string; refund_ref: string; payout_type: string; payout_name: string; payout_number: string; payout_account: string };
-type Plat = { type: string; name: string; number: string; account: string; instructions: string };
+type Pay = { id: string; client_name: string; client_phone: string; appointment_at: string; status: string; created_at: string; service_name: string; business_name: string; total_price: number; deposit_amount: number; commission_rate: number; commission_amount: number; salon_deposit_share: number; balance_amount: number; payment_status: string; payment_ref: string; payout_status: string; payout_ref: string; refund_status: string; refund_ref: string; payment_method: string; payout_type: string; payout_name: string; payout_number: string; payout_account: string };
+type Plat = { methods: Method[]; note: string };
 type Money = { commission: number; payoutsDue: number; refundsDue: number; toCheck: number };
 const kes = (n: number) => 'KES ' + n.toLocaleString('en-KE');
 const fmt = (iso: string) => new Date(iso).toLocaleString('en-KE', { timeZone: 'Africa/Nairobi', dateStyle: 'medium', timeStyle: 'short' });
@@ -54,12 +55,12 @@ export default function AdminDashboard({ stats, businesses, bookings, charts, mo
     } catch (e) { setError(e instanceof Error ? e.message : 'Something went wrong.'); setBusy(''); }
   }
   const [platMsg, setPlatMsg] = useState('');
-  async function savePlatform(e: React.FormEvent<HTMLFormElement>) {
+  async function saveNote(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault(); setPlatMsg(''); setError('');
     try {
-      const r = await fetch('/api/admin/payments', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'save-platform', ...Object.fromEntries(new FormData(e.currentTarget)) }) });
+      const r = await fetch('/api/admin/payments', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'save-note', ...Object.fromEntries(new FormData(e.currentTarget)) }) });
       const j = await r.json() as { error?: string }; if (!r.ok) throw new Error(j.error);
-      setPlatMsg('Saved. Customers will now see these details when they pay a deposit.');
+      setPlatMsg('Note saved.');
     } catch (err) { setError(err instanceof Error ? err.message : 'Something went wrong.'); }
   }
   const emails = useMemo(() => Array.from(new Set(shown.map(b => b.owner_email))), [shown]);
@@ -80,6 +81,7 @@ export default function AdminDashboard({ stats, businesses, bookings, charts, mo
       <BarList title="Bookings by status" sub="All time" rows={charts.byStatus} empty="No bookings yet."/>
       <BarList title="Top places" sub="Live businesses by location" rows={charts.byPlace} empty="No live businesses yet."/>
     </div>
+    {!platform.type && <div className="adm-note" role="alert"><strong>Add your payment account.</strong> Customers cannot pay deposits to you until you do. <button className="adm-btn ok" onClick={() => setTab('payments')}>Add it now</button></div>}
     {error && <p role="alert" className="error">{error}</p>}
     {note && <div className="adm-note" role="status">Temporary password for <strong>{note.email}</strong>: <code>{note.password}</code><span className="adm-sub">Shown once. Send it to the owner privately and ask them to change it from their dashboard after signing in.</span></div>}
     <div className="adm-tabs" role="tablist">
@@ -89,15 +91,16 @@ export default function AdminDashboard({ stats, businesses, bookings, charts, mo
     </div>
     {tab === 'payments' ? <>
       <section className="card settings-card" style={{ marginBottom: 16 }}><h2>Where customers pay their deposit</h2>
-        <p className="muted">Your STAJ collection account. Customers see this after they book. Replaced by automatic collection once a payment provider is connected.</p>
-        <form className="form" onSubmit={savePlatform}><PayoutFields initial={platform} extra={<label>Extra note for customers (optional)<input name="instructions" maxLength={300} defaultValue={platform.instructions}/></label>}/><button className="button">Save</button></form>{platMsg && <p className="success" role="status">{platMsg}</p>}
+        <p className="muted">Add every way you can receive money. Customers choose one of these when they pay. Replaced by automatic collection once a payment provider is connected.</p>
+        <MethodsEditor initial={platform.methods} endpoint="/api/admin/payments" actions={{ add: 'add-platform', remove: 'remove-platform', primary: 'primary-platform' }}/>
+        <form className="form" onSubmit={saveNote} style={{ marginTop: 14 }}><label>Extra note for customers (optional)<input name="instructions" maxLength={300} defaultValue={platform.note}/></label><button className="button outline small">Save note</button></form>{platMsg && <p className="success" role="status">{platMsg}</p>}
       </section>
       {noPayout.length > 0 && <p className="adm-note">Live businesses with no payout details yet (they cannot take bookings): {noPayout.map(x => x.name).join(', ')}.</p>}
       <div className="adm-wrap card"><table className="adm-table"><thead><tr><th>Booking</th><th>Money</th><th>Deposit</th><th>Salon payout</th><th>Refund</th></tr></thead><tbody>
         {pays.length ? pays.map(k => <tr key={k.id}>
           <td><strong>{k.client_name}</strong><span className="adm-sub">{k.client_phone}</span><span className="adm-sub">{k.service_name} · {k.business_name}</span><span className="adm-sub">{fmt(k.appointment_at)} · {k.status}</span></td>
           <td>Total {kes(k.total_price)}<span className="adm-sub">Deposit {kes(k.deposit_amount)}</span><span className="adm-sub">Commission {k.commission_rate}% = {kes(k.commission_amount)}</span><span className="adm-sub">Salon share {kes(k.salon_deposit_share)} · Balance {kes(k.balance_amount)}</span></td>
-          <td>{k.payment_status === 'deposit_paid' ? 'Paid' : k.payment_status === 'deposit_submitted' ? 'Customer says paid' : k.payment_status === 'expired' ? 'Expired' : 'Waiting'}{k.payment_ref && <span className="adm-sub">Code {k.payment_ref}</span>}
+          <td>{k.payment_status === 'deposit_paid' ? 'Paid' : k.payment_status === 'deposit_submitted' ? 'Customer says paid' : k.payment_status === 'expired' ? 'Expired' : 'Waiting'}{k.payment_ref && <span className="adm-sub">Code {k.payment_ref}{k.payment_method ? ' via ' + k.payment_method : ''}</span>}
             {(k.payment_status === 'awaiting_deposit' || k.payment_status === 'deposit_submitted' || k.payment_status === 'expired') && <div className="adm-actions"><button className="adm-btn ok" disabled={!!busy} onClick={() => pay('confirm-deposit', k.id, 'M-Pesa code you received (optional):')}>Confirm deposit</button>{k.payment_status !== 'expired' && <button className="adm-btn danger" disabled={!!busy} onClick={() => pay('reject-deposit', k.id)}>Not received</button>}</div>}</td>
           <td>{k.payout_status === 'due' ? <><strong>Send {kes(k.salon_deposit_share)}</strong><span className="adm-sub">{PAYOUT_LABEL[k.payout_type]}: {k.payout_name} · {k.payout_number}{k.payout_account ? ' · ' + k.payout_account : ''}</span><div className="adm-actions"><button className="adm-btn ok" disabled={!!busy} onClick={() => pay('payout-paid', k.id, 'Your payment reference for this payout (optional):')}>Mark sent</button></div></> : k.payout_status === 'paid' ? <>Sent<span className="adm-sub">{k.payout_ref}</span></> : '—'}</td>
           <td>{k.refund_status === 'due' ? <><strong>Refund {kes(k.deposit_amount)}</strong><span className="adm-sub">to {k.client_phone}</span><div className="adm-actions"><button className="adm-btn ok" disabled={!!busy} onClick={() => pay('refund-done', k.id, 'Refund reference (optional):')}>Mark refunded</button></div></> : k.refund_status === 'refunded' ? <>Refunded<span className="adm-sub">{k.refund_ref}</span></> : (k.payment_status === 'deposit_paid' && ['pending', 'confirmed'].includes(k.status)) ? <button className="adm-btn danger" disabled={!!busy} onClick={() => pay('cancel-refund', k.id)}>Cancel &amp; refund</button> : '—'}</td></tr>) : <tr><td colSpan={5}>No paid bookings yet.</td></tr>}
